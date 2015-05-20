@@ -1,4 +1,3 @@
-__author__ = 'ssven'
 import csv
 import numpy as np
 
@@ -8,14 +7,15 @@ def train():
     file = csv.reader(open('../data/train.csv', 'rbU'))
 
     # first line isn't data
-    header = file.next()
+    file.next()
 
     data = np.array([row for row in file])
     return data
 
+
 def test():
-    file  = csv.reader(open('../data/test.csv', 'rbU'))
-    header = file.next()
+    file = csv.reader(open('../data/test.csv', 'rbU'))
+    file.next()
 
     pred_file = csv.writer(open('../data/genderbasedmodel.csv', 'wb'))
 
@@ -25,7 +25,6 @@ def test():
             pred_file.writerow([row[0],  '1'])
         else:
             pred_file.writerow([row[0], '0'])
-
 
 
 if __name__ == "__main__":
