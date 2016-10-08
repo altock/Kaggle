@@ -2,13 +2,13 @@ import numpy as np
 import pandas as pd
 
 from sklearn import preprocessing, cross_validation, neighbors, svm
-from sklearn.ensemble import RandomForestClassifier, BaggingClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier, BaggingClassifier, VotingClassifier, GradientBoostingClassifier, ExtraTreesClassifier
 from sklearn.cluster import KMeans
 from scipy.stats import mode
 import csv as csv
 
 
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.tree import DecisionTreeClassifier
 
 def handle_non_numerical_data(df): 
@@ -33,6 +33,28 @@ def handle_non_numerical_data(df):
     return df
 
 
+def get_ensemble(X,y):
+	num_folds = 10
+
+	kfold = KFold(n_splits=num_folds)
+	# create the sub models
+	estimators = []
+	model1 = LogisticRegressionCV()
+	estimators.append(('logistic', model1))
+	model3 = svm.SVC(C=1, gamma=0.001)
+	estimators.append(('svm rbf', model3))
+	model4 = BaggingClassifier(svm.SVC(kernel='poly',C=2))
+	estimators.append(('svm poly', model4))
+	forest = RandomForestClassifier(n_estimators=100, max_features='sqrt', n_jobs = -1)
+	estimators.append((('forest'),forest))
+	clf = BaggingClassifier(neighbors.KNeighborsClassifier(n_jobs=-1))
+	estimators.append(('KNN',clf))
+	# create the ensemble model
+	ensemble = VotingClassifier(estimators, n_jobs=-1)
+#     results = cross_val_score(ensemble, X, y, cv=kfold)
+#     print(results.mean())
+
+    return ensemble
 
 def cross_train_and_test(clf,X,y):
 	X_train, X_test, y_train, y_test = cross_validation.train_test_split(X,y,test_size=0.2)
@@ -97,7 +119,7 @@ def prepare_dataframe(df):
 
 
 	# get rid of useless fields
-	df.drop(['Name', 'PassengerId'], 1, inplace=True)
+	df.drop(['Name', 'PassengerId','Ticket','Cabin'], 1, inplace=True)
 	df.convert_objects(convert_numeric=True)
 	df.fillna(0,inplace=True)
 
@@ -169,27 +191,47 @@ def get_prediction(X,y, test_X):
 
 def get_prediction_new(X,y,test_X):
 	num_folds = 10
-	num_instances = len(X)
-	seed = 7
-	kfold = cross_validation.KFold(n=num_instances, n_folds=num_folds, random_state=seed)
+	
+	kfold = KFold(num_splits=num_folds)
 	# create the sub models
 	estimators = []
-	model1 = LogisticRegression()
+	model1 = LogisticRegressionCV()
 	estimators.append(('logistic', model1))
-	model2 = DecisionTreeClassifier()
+	model2 = GradientBoostingClassifier()
 	estimators.append(('cart', model2))
-	model3 = svm.SVC(C=2)
-	estimators.append(('svm', model2))
-	forest = RandomForestClassifier(n_estimators=200)
+	model3 = BaggingClassifier(svm.SVC(C=2))
+	estimators.append(('svm rbf', model3))
+	model4 = BaggingClassifier(svm.SVC(kernel='poly',C=2))
+	estimators.append(('svm poly', model4))
+	model5 = ExtraTreesClassifier()
+	estimators.append(('extra trees', model5))
+	
+	forest = RandomForestClassifier(n_estimators=100)
 	estimators.append((('forest'),forest))
-	clf = neighbors.KNeighborsClassifier(n_jobs=-1)
-	estimators.append(('KNN',clf))
+	# clf = BaggingClassifier(neighbors.KNeighborsClassifier(n_jobs=-1))
+	# estimators.append(('KNN',clf))
 	# create the ensemble model
 	ensemble = VotingClassifier(estimators)
 	results = cross_validation.cross_val_score(ensemble, X, y, cv=kfold)
 	print(results.mean())
 	ensemble.fit(X,y)
 	return ensemble.predict(test_X)
+
+def get_svm(clf, X_train,y_train,X_test):
+	
+	clf.fit(X_train,y_train)
+
+
+	return clf.predict( X_test).astype(int)
+
+def accuracy_classifier(clf, X_train, y_train):
+	num_folds = 10
+	num_instances = len(X_train)
+	seed = 7
+	kfold = cross_validation.KFold(n=num_instances, n_folds=num_folds, random_state=seed)
+	
+	results = cross_validation.cross_val_score(clf, X_train, y_train, cv=kfold)
+	print(results.mean())
 
 
 if __name__ == '__main__':
@@ -221,11 +263,18 @@ if __name__ == '__main__':
 	X_test = np.array(df_test.astype(float))
 	X_test = preprocessing.scale(X_test)
 
+	# clf = svm.SVC(kernel='rbf',C=1,gamma=0.001)
+	# accuracy_classifier(clf,X_train, y_train)
+	# output = get_svm(clf,X_train, y_train, X_test)
 
-	output = get_prediction_new(X_train, y_train, X_test)
+	ensemble = get_ensemble(X_train,y_train)
+	results = cross_validation.cross_val_score(ensemble, X_train,y_train)
+	print(results.mean())
+	ensemble.fit(X_train,y_train)
+	output = ensemble.predict(X_train)
 
 
-	predictions_file = open("data/titanicSVM1.csv", "w")
+	predictions_file = open("data/titanicVoting1.csv", "w")
 	open_file_object = csv.writer(predictions_file)
 	open_file_object.writerow(["PassengerId","Survived"])
 	open_file_object.writerows(zip(PassengerId, output))
