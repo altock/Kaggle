@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Bosch documentation build configuration file, created by
+# GoT documentation build configuration file, created by
 # sphinx-quickstart.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -41,7 +41,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Bosch'
+project = u'GoT'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -185,7 +185,7 @@ latex_elements = {
 latex_documents = [
     ('index',
      'Kaggle.tex',
-     u'Bosch Documentation',
+     u'GoT Documentation',
      u"altock", 'manual'),
 ]
 
@@ -215,7 +215,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'Kaggle', u'Bosch Documentation',
+    ('index', 'Kaggle', u'GoT Documentation',
      [u"altock"], 1)
 ]
 
@@ -229,9 +229,9 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index', 'Kaggle', u'Bosch Documentation',
-     u"altock", 'Bosch',
-     'Kaggle's Bosch competition', 'Miscellaneous'),
+    ('index', 'Kaggle', u'GoT Documentation',
+     u"altock", 'GoT',
+     'Game of Thrones Data Set from Kaggle', 'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.

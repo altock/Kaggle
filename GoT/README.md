@@ -1,7 +1,7 @@
-Bosch
+GoT
 ==============================
 
-Kaggle's Bosch competition
+Game of Thrones Data Set from Kaggle
 
 Project Organization
 ------------
