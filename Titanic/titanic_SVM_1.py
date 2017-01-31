@@ -1,4 +1,5 @@
 import numpy as np
+			print("{}\t{}".format(date_str, count))
 import pandas as pd
 
 from sklearn import preprocessing, cross_validation, neighbors, svm
