@@ -1,6 +1,6 @@
 import numpy as np
 from math import sqrt
-
+from collections import defaultdict
 
 # Distance-based simularity score
 def sim_dist(prefs, person1, person2):
@@ -64,3 +64,30 @@ def topMatches(prefs, person, n=5, similarity=sim_pearson):
 
     scores.sort(reverse=True)
     return scores[0:n]
+
+# Get's recommendations using weighted average of other user's rankings
+def getRecommendations(prefs, person, similarity=sim_pearson):
+    totals = defaultdict(int)
+    simSums = defaultdict(int)
+
+    # No point getting similarity score on things both haven't reviewed
+    non_watched_prefs = prefs[prefs.rating != -1]
+    for other in prefs:
+        # Don't compare with yourself
+        if other == person:
+            continue
+
+        sim = similarity(non_watched_prefs, person, other)
+        for item in prefs[other]:
+            # Only score movies I haven't seen yet
+            if item not in prefs[person] or prefs[person][item] == -1:
+                # Similarity * score
+                totals[item] += prefs[other][item] * sim
+
+                # sum of similarities
+                simSums[item] += sim
+
+    # Normalize list
+    rankings = [(total/simSums[item],item) for item, total in list(totals.items())]
+
+    return sorted(rankings, reverse=True)
