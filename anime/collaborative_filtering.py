@@ -47,10 +47,10 @@ if __name__ == '__main__':
     # anime = pickle.load(a_file)
     # a_file.close()
 
-    # ratings = pd.read_csv(DIR_DATA + '/rating.csv')
-    # labeled_ratings = ratings[ratings["rating"] != -1]
-    # user_preferences = get_user_preferences(ratings)
-    # pickle_user_preferences(user_preferences)
+    ratings = pd.read_csv(DIR_DATA + '/rating.csv')
+    labeled_ratings = ratings[ratings["rating"] != -1]
+    user_preferences = get_user_preferences(ratings)
+    pickle_user_preferences(user_preferences)
 
     with open(DIR_PROCESSED + '/user_preferences_dict.pickle', 'rb') as p_file:
         user_preferences = pickle.load(p_file)
