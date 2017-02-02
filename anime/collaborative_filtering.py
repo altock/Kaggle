@@ -46,20 +46,22 @@ if __name__ == '__main__':
     # anime = pickle.load(a_file)
     # a_file.close()
 
-    ratings = pd.read_csv(DIR_DATA + '/rating.csv')
-    labeled_ratings = ratings
-    user_preferences = get_user_preferences(ratings)
-    pickle_user_preferences(user_preferences)
+    # ratings = pd.read_csv(DIR_DATA + '/rating.csv')
+    # labeled_ratings = ratings
+    # user_preferences = get_user_preferences(ratings)
+    # pickle_user_preferences(user_preferences)
+    # print("Pickled")
 
-    print("Finished pickling")
     with open(DIR_PROCESSED + '/user_preferences_dict.pickle', 'rb') as p_file:
         user_preferences = pickle.load(p_file)
         users = list(user_preferences.keys())
 
         # print(type(user_preferences[users[0]][str(11266)]))
 
-        p1 = users[0]
+        p3 = users[2]
+        # print(user_preferences[p1])
         # for p2 in users[1:1000]:
         #     print(sim_pearson(user_preferences, p1, p2))
-        print(getRecommendations(user_preferences, p1 ))
-        print(getRecommendations(user_preferences,users[1]))
+        print(get_recommendations(user_preferences, p3))
+        print(get_recommendations(user_preferences, p3, similarity=sim_dist))
+        print(get_recommendations(user_preferences, p3, similarity=sim_jaccard))

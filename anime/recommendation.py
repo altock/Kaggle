@@ -5,8 +5,8 @@ from collections import defaultdict
 # Distance-based simularity score
 def sim_dist(prefs, person1, person2):
     # Get list of shared items
-    p1_set = set(prefs[person1].keys())
-    p2_set = set(prefs[person2].keys())
+    p1_set = set([key for key, value in list(prefs[person1].items()) if value != -1])
+    p2_set = set([key for key, value in list(prefs[person2].items()) if value != -1])
 
     shared = p1_set & p2_set
 
@@ -20,12 +20,13 @@ def sim_dist(prefs, person1, person2):
 # Returns Pearson Correlation coefficient for p1 and p2
 def sim_pearson(prefs, p1, p2):
     # Get list of shared items
-    p1_set = set(prefs[p1].keys())
-    p2_set = set(prefs[p2].keys())
+    p1_set = set([key for key, value in list(prefs[p1].items()) if value != -1])
+    p2_set = set([key for key, value in list(prefs[p2].items()) if value != -1])
 
     shared = list(p1_set & p2_set)
 
     n = len(shared)
+
     if n == 0:
         return 0
 
@@ -57,30 +58,50 @@ def sim_pearson(prefs, p1, p2):
     r = num / den
     return r
 
+# Jaccard index
+def sim_jaccard(prefs, p1, p2):
+    # Get list of shared items
+    p1_set = set([key for key, value in list(prefs[p1].items()) if value != -1])
+    p2_set = set([key for key, value in list(prefs[p2].items()) if value != -1])
+
+    shared = p1_set & p2_set
+    n = len(shared)
+    a = len(p1_set)
+    b = len(p2_set)
+
+    if a == b == 0:
+        return 1
+    return n / (a + b - n)
+
+
 # Returns best matches for person from prefs dictionary
-def topMatches(prefs, person, n=5, similarity=sim_pearson):
+def top_matches(prefs, person, n=5, similarity=sim_pearson):
     scores = [(similarity(prefs, person, other), other)
               for other in prefs if other != person]
 
     scores.sort(reverse=True)
     return scores[0:n]
 
+
 # Get's recommendations using weighted average of other user's rankings
-def getRecommendations(prefs, person, similarity=sim_pearson):
+def get_recommendations(prefs, person, similarity=sim_pearson):
     totals = defaultdict(int)
     simSums = defaultdict(int)
 
-    # No point getting similarity score on things both haven't reviewed
-    non_watched_prefs = prefs[prefs.rating != -1]
     for other in prefs:
         # Don't compare with yourself
         if other == person:
             continue
 
-        sim = similarity(non_watched_prefs, person, other)
+        sim = similarity(prefs, person, other)
+
+        # if sim <= 0:
+        #     continue
+
         for item in prefs[other]:
             # Only score movies I haven't seen yet
-            if item not in prefs[person] or prefs[person][item] == -1:
+            if (item not in prefs[person] or prefs[person][item] == -1) and not \
+                            prefs[other][item] == -1:
                 # Similarity * score
                 totals[item] += prefs[other][item] * sim
 
@@ -88,6 +109,6 @@ def getRecommendations(prefs, person, similarity=sim_pearson):
                 simSums[item] += sim
 
     # Normalize list
-    rankings = [(total/simSums[item],item) for item, total in list(totals.items())]
+    rankings = [(total/simSums[item], item) for item, total in list(totals.items()) if simSums[item] != 0]
 
     return sorted(rankings, reverse=True)
