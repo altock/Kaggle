@@ -3,7 +3,7 @@ from math import sqrt
 from collections import defaultdict
 
 # Distance-based simularity score
-def sim_dist(prefs, person1, person2):
+def sim_dist(prefs, person1, person2, show=None):
     # Get list of shared items
     p1_set = set([key for key, value in list(prefs[person1].items()) if value != -1])
     p2_set = set([key for key, value in list(prefs[person2].items()) if value != -1])
@@ -18,10 +18,10 @@ def sim_dist(prefs, person1, person2):
     return 1 / (1 + sqrt(sum_of_squares))
 
 # Returns Pearson Correlation coefficient for p1 and p2
-def sim_pearson(prefs, p1, p2):
+def sim_pearson(prefs, p1, p2, show=None):
     # Get list of shared items
-    p1_set = set([key for key, value in list(prefs[p1].items()) if value != -1])
-    p2_set = set([key for key, value in list(prefs[p2].items()) if value != -1])
+    p1_set = set([key for key, value in list(prefs[p1].items()) if value != -1 and show != key])
+    p2_set = set([key for key, value in list(prefs[p2].items()) if value != -1 and show != key])
 
     shared = list(p1_set & p2_set)
 
@@ -59,7 +59,7 @@ def sim_pearson(prefs, p1, p2):
     return r
 
 # Jaccard index
-def sim_jaccard(prefs, p1, p2):
+def sim_jaccard(prefs, p1, p2, show=None):
     # Get list of shared items
     p1_set = set([key for key, value in list(prefs[p1].items()) if value != -1])
     p2_set = set([key for key, value in list(prefs[p2].items()) if value != -1])
@@ -82,6 +82,31 @@ def top_matches(prefs, person, n=5, similarity=sim_pearson):
     scores.sort(reverse=True)
     return scores[0:n]
 
+def get_reccomendation(show, prefs, person, similarity=sim_pearson):
+    total = 0
+    simSum = 0
+
+    for other in prefs:
+        # Don't compare with yourself
+        if other == person or show not in prefs[other] or prefs[other][show] == -1:
+            continue
+
+        sim = similarity(prefs, person, other, show)
+
+        # if sim <= 0:
+        #     continue
+        # Similarity * score
+        total += prefs[other][show] * sim
+
+        # sum of similarities
+        simSum += sim
+
+
+    # Normalize list
+    if simSum != 0:
+        return total/simSum
+    else:
+        return None
 
 # Get's recommendations using weighted average of other user's rankings
 def get_recommendations(prefs, person, similarity=sim_pearson):

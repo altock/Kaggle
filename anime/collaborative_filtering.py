@@ -5,6 +5,18 @@ from collections import defaultdict
 from settings import *
 from math import sqrt
 
+# import xgboost as xgb
+from sklearn import preprocessing, neighbors, svm
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.ensemble import RandomForestClassifier, BaggingClassifier, VotingClassifier, GradientBoostingClassifier, ExtraTreesClassifier, \
+  RandomForestRegressor, AdaBoostRegressor, RandomForestRegressor, GradientBoostingRegressor, AdaBoostClassifier
+from sklearn.cluster import KMeans
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.metrics import accuracy_score, mean_squared_error, mean_absolute_error
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.linear_model import LogisticRegression, LinearRegression
+
+
 from recommendation import *
 
 # Anime.csv
@@ -41,10 +53,60 @@ def pickle_user_preferences(user_preferences):
         pickle.dump(user_preferences, p_file)
 
 
+# Predict ratings within animes
+def predict_on_anime(animes, clf, test_size=0.2, rating='rating'):
+    X = animes.drop(['anime_id', 'name', 'rating', "episodes", "int_rating"], 1)
+    y = animes[rating]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
+
+
+    clf.fit(X_train, y_train)
+    print(rating)
+    print('Training Score: {:.3f}'.format(clf.score(X_train, y_train)))
+    print('Testing Score: %.3f' % (clf.score(X_test, y_test)))
+    print()
+
+def predict_collaborative(user_preferences):
+    # MEan squared error
+    error = 0
+    num_scored = 0
+    for user, prefs in user_preferences.items():
+        for anime_id, rating in prefs.items():
+            if rating == -1:
+                continue
+            estimate = get_reccomendation(anime_id, user_preferences, user)
+            if estimate is None:
+                continue
+            error += (rating - estimate) ** 2
+            print('\t', rating, estimate)
+            num_scored += 1
+
+        if num_scored == 0:
+            continue
+        print(user, error/num_scored)
+
+    return error / num_scored
+
+
+
+
+
 if __name__ == '__main__':
     # a_file = open(DIR_PROCESSED + '/one_hot_encoded_anime.pickle', 'rb')
     # anime = pickle.load(a_file)
     # a_file.close()
+    #
+    # clf = KNeighborsClassifier(n_jobs=-1)
+    # predict_on_anime(anime, clf, rating='int_rating')
+    #
+    #
+    # clf = KNeighborsRegressor(n_jobs=-1)
+    # predict_on_anime(anime, clf)
+
+    # TODO: Testing system to take test show out of collaboritive filtering
+    # TODO: average two scores
+
+
 
     # ratings = pd.read_csv(DIR_DATA + '/rating.csv')
     # labeled_ratings = ratings
@@ -54,14 +116,14 @@ if __name__ == '__main__':
 
     with open(DIR_PROCESSED + '/user_preferences_dict.pickle', 'rb') as p_file:
         user_preferences = pickle.load(p_file)
-        users = list(user_preferences.keys())
-
-        # print(type(user_preferences[users[0]][str(11266)]))
-
-        p3 = users[2]
-        # print(user_preferences[p1])
-        # for p2 in users[1:1000]:
-        #     print(sim_pearson(user_preferences, p1, p2))
-        print(get_recommendations(user_preferences, p3))
-        print(get_recommendations(user_preferences, p3, similarity=sim_dist))
-        print(get_recommendations(user_preferences, p3, similarity=sim_jaccard))
+        predict_collaborative(user_preferences)
+    #     users = list(user_preferences.keys())
+    #
+    #     # print(type(user_preferences[users[0]][str(11266)]))
+    #
+    #     p3 = users[2]
+    #     # print(user_preferences[p1])
+    #     # for p2 in users[1:1000]:
+    #     #     print(sim_pearson(user_preferences, p1, p2))
+    #     # print(get_recommendations(user_preferences, p3) similarity=sim_dist))
+    #     print(get_recommendations(user_preferences, p3, similarity=sim_jaccard))
