@@ -5,8 +5,8 @@ from collections import defaultdict
 # Distance-based simularity score
 def sim_dist(prefs, person1, person2, show=None):
     # Get list of shared items
-    p1_set = set([key for key, value in list(prefs[person1].items()) if value != -1])
-    p2_set = set([key for key, value in list(prefs[person2].items()) if value != -1])
+    p1_set = set([key for key, value in list(prefs[person1].items()) if value != -1 and show != key])
+    p2_set = set([key for key, value in list(prefs[person2].items()) if value != -1 and show != key])
 
     shared = p1_set & p2_set
 
@@ -61,8 +61,8 @@ def sim_pearson(prefs, p1, p2, show=None):
 # Jaccard index
 def sim_jaccard(prefs, p1, p2, show=None):
     # Get list of shared items
-    p1_set = set([key for key, value in list(prefs[p1].items()) if value != -1])
-    p2_set = set([key for key, value in list(prefs[p2].items()) if value != -1])
+    p1_set = set([key for key, value in list(prefs[p1].items()) if value != -1 and show != key])
+    p2_set = set([key for key, value in list(prefs[p2].items()) if value != -1 and show != key])
 
     shared = p1_set & p2_set
     n = len(shared)
