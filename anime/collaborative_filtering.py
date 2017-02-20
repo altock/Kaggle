@@ -5,6 +5,7 @@ from collections import defaultdict
 from settings import *
 from math import sqrt
 
+import random
 # import xgboost as xgb
 from sklearn import preprocessing, neighbors, svm
 from sklearn.preprocessing import OneHotEncoder
@@ -66,26 +67,37 @@ def predict_on_anime(animes, clf, test_size=0.2, rating='rating'):
     print('Testing Score: %.3f' % (clf.score(X_test, y_test)))
     print()
 
-def predict_collaborative(user_preferences):
-    # MEan squared error
-    error = 0
+def predict_collaborative(user_preferences, similarity=sim_pearson):
+    # Mean squared error, leave one out
+    sqrd_error = 0
+
+    abs_error = 0
     num_scored = 0
+
+
+
     for user, prefs in user_preferences.items():
-        for anime_id, rating in prefs.items():
-            if rating == -1:
-                continue
-            estimate = get_reccomendation(anime_id, user_preferences, user)
-            if estimate is None:
-                continue
-            error += (rating - estimate) ** 2
-            print('\t', rating, estimate)
-            num_scored += 1
+        rated_animes = [key for key, rating in prefs.items() if rating != -1]
+        if len(rated_animes) < 2:
+            # No point rating people who haven't watched much
+            # TODO: Full coverage later
+            continue
+
+        anime_id = random.choice(rated_animes)
+        rating = user_preferences[user][anime_id]
+        estimate = get_reccomendation(anime_id, user_preferences, user, similarity=similarity)
+        if estimate is None or estimate >= 10.5:
+            continue
+        sqrd_error += (rating - estimate) ** 2
+        abs_error += abs(rating-estimate)
+        print('\t', rating, estimate)
+        num_scored += 1
 
         if num_scored == 0:
             continue
-        print(user, error/num_scored)
+        print(user, sqrd_error/num_scored, sqrt(sqrd_error / num_scored), abs_error/num_scored)
 
-    return error / num_scored
+    return sqrd_error / num_scored
 
 
 
@@ -116,7 +128,7 @@ if __name__ == '__main__':
 
     with open(DIR_PROCESSED + '/user_preferences_dict.pickle', 'rb') as p_file:
         user_preferences = pickle.load(p_file)
-        predict_collaborative(user_preferences)
+        predict_collaborative(user_preferences, similarity=sim_jaccard)
     #     users = list(user_preferences.keys())
     #
     #     # print(type(user_preferences[users[0]][str(11266)]))
