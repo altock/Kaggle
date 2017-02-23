@@ -15,7 +15,7 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.metrics import accuracy_score, mean_squared_error, mean_absolute_error
 from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression, LogisticRegressionCV
 
 
 from recommendation import *
@@ -67,6 +67,54 @@ def predict_on_anime(animes, clf, test_size=0.2, rating='rating'):
     print('Testing Score: %.3f' % (clf.score(X_test, y_test)))
     print()
 
+def predict_user_on_anime(animes, user_prefs, clf, anime_id):
+    X_test = animes.drop(['anime_id', 'name', 'rating', "episodes", "int_rating"], 1)[animes.anime_id == anime_id]
+    X_test['Watched'] = 1
+    X = animes.drop(animes.anime_id == anime_id)
+    X['Watched'] = 0
+    X_train = X.drop(['anime_id', 'name', 'rating', "episodes", "int_rating"], 1)
+    y_train = X.int_rating.values
+
+    for id, r in user_prefs.items():
+        if id != anime_id and r != -1:
+            y_train[(X.anime_id == id).values] = r
+            X_train.Watched[(X.anime_id == id).values] = 1
+    clf.fit(X_train, y_train)
+    pred = clf.predict(X_test)[0]
+    return pred
+
+def predict_content(user_preferences, anime, clf):
+    # Mean squared error, leave one out
+    sqrd_error = 0
+
+    abs_error = 0
+    num_scored = 0
+
+
+
+    for user, prefs in user_preferences.items():
+        rated_animes = [key for key, rating in prefs.items() if rating != -1]
+        if len(rated_animes) < 2:
+            # No point rating people who haven't watched much
+            # TODO: Full coverage later
+            continue
+
+        anime_id = random.choice(rated_animes)
+        rating = user_preferences[user][anime_id]
+        estimate = predict_user_on_anime(anime, prefs, clf, anime_id)
+        if estimate is None or estimate >= 10.5:
+            continue
+        sqrd_error += (rating - estimate) ** 2
+        abs_error += abs(rating-estimate)
+        print('\t','Rating: ', rating,'; Prediction: ', estimate)
+        num_scored += 1
+
+        if num_scored == 0:
+            continue
+        print(user, sqrd_error/num_scored, sqrt(sqrd_error / num_scored), abs_error/num_scored)
+
+    return sqrd_error / num_scored
+
 def predict_collaborative(user_preferences, similarity=sim_pearson):
     # Mean squared error, leave one out
     sqrd_error = 0
@@ -104,11 +152,18 @@ def predict_collaborative(user_preferences, similarity=sim_pearson):
 
 
 if __name__ == '__main__':
-    # a_file = open(DIR_PROCESSED + '/one_hot_encoded_anime.pickle', 'rb')
-    # anime = pickle.load(a_file)
-    # a_file.close()
+    a_file = open(DIR_PROCESSED + '/one_hot_encoded_anime.pickle', 'rb')
+    anime = pickle.load(a_file)
+    a_file.close()
     #
-    # clf = KNeighborsClassifier(n_jobs=-1)
+    # clf = KNeighborsClassifier(n_jobs=-1, n_neighbors=11)
+    clf = LogisticRegressionCV(n_jobs=-1)
+    # clf = LinearRegression(n_jobs=-1)
+    # clf = xgb.XGBClassifier(nthread=-1)
+    # clf = RandomForestClassifier()
+    # clf = RandomForestRegressor(n_jobs=-1)
+    # clf = xgb.XGBRegressor(nthread=-1)
+    # clf = KNeighborsRegressor(n_jobs=-1)
     # predict_on_anime(anime, clf, rating='int_rating')
     #
     #
@@ -128,7 +183,7 @@ if __name__ == '__main__':
 
     with open(DIR_PROCESSED + '/user_preferences_dict.pickle', 'rb') as p_file:
         user_preferences = pickle.load(p_file)
-        predict_collaborative(user_preferences, similarity=sim_jaccard)
+        predict_content(user_preferences, anime, clf)
     #     users = list(user_preferences.keys())
     #
     #     # print(type(user_preferences[users[0]][str(11266)]))
