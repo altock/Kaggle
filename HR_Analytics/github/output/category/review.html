@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8" />
+        <title>Sven's Projects - Review</title>
+        <link rel="stylesheet" href="/theme/css/main.css" />
+
+        <!--[if IE]>
+            <script src="https://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Sven's Projects </a></h1>
+                <nav><ul>
+                    <li class="active"><a href="/category/review.html">Review</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+
+            <aside id="featured" class="body">
+                <article>
+                    <h1 class="entry-title"><a href="/hr-analytics.html">HR Analytics</a></h1>
+<footer class="post-info">
+        <abbr class="published" title="2010-12-03T10:20:00-05:00">
+                Published: Fri 03 December 2010
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="/author/sven.html">Sven</a>
+        </address>
+<p>In <a href="/category/review.html">Review</a>.</p>
+
+</footer><!-- /.post-info --><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="c1"># import xgboost as xgb</span>
+<span class="kn">from</span> <span class="nn">sklearn</span> <span class="kn">import</span> <span class="n">preprocessing</span><span class="p">,</span> <span class="n">neighbors</span><span class="p">,</span> <span class="n">svm</span>
+<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">OneHotEncoder</span>
+<span class="kn">from</span> <span class="nn">sklearn.ensemble</span> <span class="kn">import</span> <span class="n">RandomForestClassifier</span><span class="p">,</span> <span class="n">BaggingClassifier</span><span class="p">,</span> <span class="n">VotingClassifier</span><span class="p">,</span> <span class="n">GradientBoostingClassifier</span><span class="p">,</span> <span class="n">ExtraTreesClassifier</span><span class="p">,</span> \
+  <span class="n">RandomForestRegressor</span><span class="p">,</span> <span class="n">AdaBoostRegressor</span><span class="p">,</span> <span class="n">RandomForestRegressor</span><span class="p">,</span> <span class="n">GradientBoostingRegressor</span><span class="p">,</span> <span class="n">AdaBoostClassifier</span>
+<span class="kn">from</span> <span class="nn">sklearn.cluster</span> <span class="kn">import</span> <span class="n">KMeans</span>
+<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">accuracy_score</span><span class="p">,</span> <span class="n">mean_squared_error</span><span class="p">,</span> <span class="n">mean_absolute_error</span><span class="p">,</span> <span class="n">r2_score</span><span class="p">,</span> <span class="n">confusion_matrix</span><span class="p">,</span> <span class="n">classification_report</span>
+<span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">cross_val_score</span><span class="p">,</span> <span class="n">train_test_split</span><span class="p">,</span> <span class="n">learning_curve</span>
+<span class="kn">from</span> <span class="nn">sklearn.linear_model</span> <span class="kn">import</span> <span class="n">LogisticRegression</span><span class="p">,</span> <span class="n">LinearRegression</span><span class="p">,</span> <span class="n">LogisticRegressionCV</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.decomposition</span> <span class="kn">import</span> <span class="n">PCA</span>
+
+<span class="o">%</span><span class="n">matplotlib</span> <span class="n">inline</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="kn">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">mpl_toolkits.mplot3d</span> <span class="kn">import</span> <span class="n">Axes3D</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span>
+
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">cycle</span>
+
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="n">DIR_DATA</span> <span class="o">=</span> <span class="s2">&quot;data&quot;</span>
+<span class="n">DIR_PROCESSED</span> <span class="o">=</span> <span class="s2">&quot;processed&quot;</span>
+<span class="n">LABEL</span> <span class="o">=</span> <span class="s2">&quot;rating&quot;</span>
+<span class="n">NON_PREDICTORS</span> <span class="o">=</span> <span class="p">[</span><span class="n">LABEL</span><span class="p">]</span><span class="c1">#, &quot;name&quot;,&quot;anime_id&quot;]</span>
+<span class="n">CV_FOLDS</span> <span class="o">=</span> <span class="mi">5</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># HR_comma_sep.csv</span>
+
+<span class="c1"># Employee satisfaction level</span>
+<span class="c1"># Last evaluation</span>
+<span class="c1"># Number of projects</span>
+<span class="c1"># Average monthly hours</span>
+<span class="c1"># Time spent at the company</span>
+<span class="c1"># Whether they have had a work accident</span>
+<span class="c1"># Whether they have had a promotion in the last 5 years</span>
+<span class="c1"># Department</span>
+<span class="c1"># Salary</span>
+<span class="c1"># Whether the employee has left</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">hr</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">DIR_DATA</span> <span class="o">+</span> <span class="s1">&#39;/HR_comma_sep.csv&#39;</span><span class="p">)</span>
+<span class="n">hr</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>satisfaction_level</th>
+      <th>last_evaluation</th>
+      <th>number_project</th>
+      <th>average_montly_hours</th>
+      <th>time_spend_company</th>
+      <th>Work_accident</th>
+      <th>left</th>
+      <th>promotion_last_5years</th>
+      <th>sales</th>
+      <th>salary</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0.38</td>
+      <td>0.53</td>
+      <td>2</td>
+      <td>157</td>
+      <td>3</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>sales</td>
+      <td>low</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>0.80</td>
+      <td>0.86</td>
+      <td>5</td>
+      <td>262</td>
+      <td>6</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>sales</td>
+      <td>medium</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>0.11</td>
+      <td>0.88</td>
+      <td>7</td>
+      <td>272</td>
+      <td>4</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>sales</td>
+      <td>medium</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>0.72</td>
+      <td>0.87</td>
+      <td>5</td>
+      <td>223</td>
+      <td>5</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>sales</td>
+      <td>low</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0.37</td>
+      <td>0.52</td>
+      <td>2</td>
+      <td>159</td>
+      <td>3</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>sales</td>
+      <td>low</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="highlight"><pre><span></span><span class="k">print</span><span class="p">(</span><span class="s1">&#39;Percent who left: {:.2f}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">left</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">left</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">))</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Percent who left: 23.81
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">sales</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;category&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">categories</span><span class="p">))</span>
+<span class="n">hr</span><span class="o">.</span><span class="n">sales</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">sales</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;category&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">codes</span>
+<span class="n">hr</span><span class="o">.</span><span class="n">salary</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">salary</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s1">&#39;category&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">cat</span><span class="o">.</span><span class="n">codes</span>
+<span class="c1"># hr.Work_accident = hr.Work_accident.astype(&#39;category&#39;)</span>
+<span class="c1"># hr.promotion_last_5years = hr.promotion_last_5years.astype(&#39;category&#39;)</span>
+<span class="c1"># hr.left = hr.left.astype(&#39;category&#39;)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># Department metrics don&#39;t work</span>
+
+<span class="c1"># hr[&quot;is_4&quot;] = hr.sales.apply(lambda x: x== 4)</span>
+
+<span class="c1"># depProperties = hr.groupby(&#39;sales&#39;).agg({&#39;promotion_last_5years&#39;:np.mean}).values</span>
+<span class="c1"># hr[&quot;avg_per_team&quot;] = hr.sales.apply(lambda x: depProperties[x])</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">hr</span><span class="o">.</span><span class="n">salary</span><span class="o">.</span><span class="n">dtype</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>dtype(&#39;int8&#39;)
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">hr</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>satisfaction_level</th>
+      <th>last_evaluation</th>
+      <th>number_project</th>
+      <th>average_montly_hours</th>
+      <th>time_spend_company</th>
+      <th>Work_accident</th>
+      <th>left</th>
+      <th>promotion_last_5years</th>
+      <th>sales</th>
+      <th>salary</th>
+      <th>is_4</th>
+      <th>avg_per_team</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0.38</td>
+      <td>0.53</td>
+      <td>2</td>
+      <td>157</td>
+      <td>3</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>7</td>
+      <td>1</td>
+      <td>False</td>
+      <td>[0.024154589372]</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>0.80</td>
+      <td>0.86</td>
+      <td>5</td>
+      <td>262</td>
+      <td>6</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>7</td>
+      <td>2</td>
+      <td>False</td>
+      <td>[0.024154589372]</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>0.11</td>
+      <td>0.88</td>
+      <td>7</td>
+      <td>272</td>
+      <td>4</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>7</td>
+      <td>2</td>
+      <td>False</td>
+      <td>[0.024154589372]</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>0.72</td>
+      <td>0.87</td>
+      <td>5</td>
+      <td>223</td>
+      <td>5</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>7</td>
+      <td>1</td>
+      <td>False</td>
+      <td>[0.024154589372]</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0.37</td>
+      <td>0.52</td>
+      <td>2</td>
+      <td>159</td>
+      <td>3</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>7</td>
+      <td>1</td>
+      <td>False</td>
+      <td>[0.024154589372]</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">predict_left</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">clf</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">):</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s1">&#39;left&#39;</span><span class="p">],</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">left</span> 
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="n">test_size</span><span class="p">)</span>
+
+
+    <span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+
+    <span class="n">train_pred</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+    <span class="n">test_pred</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Training Score: {:.3f}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">clf</span><span class="o">.</span><span class="n">score</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)))</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Testing Score: </span><span class="si">%.3f</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">clf</span><span class="o">.</span><span class="n">score</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">)))</span>
+
+    <span class="k">print</span><span class="p">()</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">classifiers</span> <span class="o">=</span> <span class="p">[</span><span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">),</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">criterion</span><span class="o">=</span><span class="s1">&#39;entropy&#39;</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">),</span> <span class="n">svm</span><span class="o">.</span><span class="n">SVC</span><span class="p">(),</span> <span class="n">LogisticRegressionCV</span><span class="p">(),</span> <span class="n">LinearRegression</span><span class="p">(),</span> <span class="n">AdaBoostClassifier</span><span class="p">(),</span><span class="n">GradientBoostingClassifier</span><span class="p">(),</span> <span class="n">neighbors</span><span class="o">.</span><span class="n">KNeighborsClassifier</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="c1">#, GradientBoostingClassifier(),  neighbors.KNeighborsClassifier(n_jobs=-1)]</span>
+<span class="c1"># classifiers = [RandomForestClassifier(n_estimators=500 ,n_jobs=-1), RandomForestClassifier(n_estimators=500, criterion=&#39;entropy&#39;, n_jobs=-1), xgb.XGBClassifier(n_estimators=500, nthread=-1)]# svm.SVC()]</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">clf</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">classifiers</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Classifier &#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+
+    <span class="n">predict_left</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">clf</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.4</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Classifier  0
+Training Score: 0.998
+Testing Score: 0.988
+
+Classifier  1
+Training Score: 0.998
+Testing Score: 0.985
+
+Classifier  2
+Training Score: 0.956
+Testing Score: 0.944
+
+Classifier  3
+Training Score: 0.776
+Testing Score: 0.778
+
+Classifier  4
+Training Score: 0.200
+Testing Score: 0.189
+
+Classifier  5
+Training Score: 0.960
+Testing Score: 0.960
+
+Classifier  6
+Training Score: 0.979
+Testing Score: 0.975
+
+Classifier  7
+Training Score: 0.950
+Testing Score: 0.930
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">classifiers</span> <span class="o">=</span> <span class="p">[</span><span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">),</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">criterion</span><span class="o">=</span><span class="s1">&#39;entropy&#39;</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">),</span> <span class="n">svm</span><span class="o">.</span><span class="n">SVC</span><span class="p">(),</span> <span class="n">LogisticRegressionCV</span><span class="p">(),</span> <span class="n">LinearRegression</span><span class="p">(),</span> <span class="n">AdaBoostClassifier</span><span class="p">(),</span><span class="n">GradientBoostingClassifier</span><span class="p">(),</span> <span class="n">neighbors</span><span class="o">.</span><span class="n">KNeighborsClassifier</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span> <span class="c1">#, GradientBoostingClassifier(),  neighbors.KNeighborsClassifier(n_jobs=-1)]</span>
+<span class="c1"># classifiers = [RandomForestClassifier(n_estimators=500 ,n_jobs=-1), RandomForestClassifier(n_estimators=500, criterion=&#39;entropy&#39;, n_jobs=-1), xgb.XGBClassifier(n_estimators=500, nthread=-1)]# svm.SVC()]</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">clf</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">classifiers</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Classifier &#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+
+    <span class="n">predict_left</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">clf</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Classifier  0
+Training Score: 0.999
+Testing Score: 0.987
+
+Classifier  1
+Training Score: 0.998
+Testing Score: 0.988
+
+Classifier  2
+Training Score: 0.958
+Testing Score: 0.953
+
+Classifier  3
+Training Score: 0.775
+Testing Score: 0.763
+
+Classifier  4
+Training Score: 0.197
+Testing Score: 0.193
+
+Classifier  5
+Training Score: 0.959
+Testing Score: 0.962
+
+Classifier  6
+Training Score: 0.976
+Testing Score: 0.980
+
+Classifier  7
+Training Score: 0.953
+Testing Score: 0.929
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">cross_val_left</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">clf</span><span class="p">,</span> <span class="n">cv_folds</span><span class="o">=</span><span class="n">CV_FOLDS</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">]):</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">drop</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="c1">#, &#39;sales&#39;, &#39;salary&#39;],1)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">left</span> 
+    <span class="n">scores</span> <span class="o">=</span> <span class="n">cross_val_score</span><span class="p">(</span><span class="n">clf</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="n">cv_folds</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span><span class="c1">#, scoring=&#39;roc_auc&#39;)</span>
+
+
+
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Cross val score: &#39;</span><span class="p">,</span> <span class="nb">sum</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span> <span class="o">/</span> <span class="n">cv_folds</span> <span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+
+    <span class="k">print</span><span class="p">()</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">classifiers</span> <span class="o">=</span> <span class="p">[</span><span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span> <span class="p">,</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">),</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">criterion</span><span class="o">=</span><span class="s1">&#39;entropy&#39;</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span><span class="c1">#, svm.SVC()]#xgb.XGBClassifier(n_estimators=500, nthread=-1)]# svm.SVC()]</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">clf</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">classifiers</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Classifier &#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+
+    <span class="n">cross_val_left</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">clf</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Classifier  0
+Cross val score:  0.991866333178
+[ 0.9990003332  0.9806666667  0.9856666667  0.999333111   0.9946648883]
+
+Classifier  1
+Cross val score:  0.991666333163
+[ 0.998667111   0.9806666667  0.9853333333  0.9989996666  0.9946648883]
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s1">&#39;left&#39;</span><span class="p">],</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">left</span> 
+<span class="n">train_sizes</span><span class="p">,</span> <span class="n">train_scores</span><span class="p">,</span> <span class="n">valid_scores</span> <span class="o">=</span> <span class="n">learning_curve</span><span class="p">(</span><span class="n">clf</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">train_sizes</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">.</span><span class="mi">1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">cv</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">print</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">[[ 0.9773408864  0.9776666667  0.9816666667  0.9943314438  0.9886628876]</span>
+ <span class="k">[ 0.9783405531  0.9783333333  0.9816666667  0.9963321107  0.9913304435]</span>
+ <span class="k">[ 0.9783405531  0.979         0.9826666667  0.9973324441  0.9929976659]</span>
+ <span class="k">[ 0.9783405531  0.979         0.9813333333  0.9976658886  0.9936645549]</span>
+ <span class="k">[ 0.9946684439  0.979         0.9823333333  0.9983327776  0.9939979993]</span>
+ <span class="k">[ 0.9993335555  0.9803333333  0.9823333333  0.999333111   0.9943314438]</span>
+ <span class="k">[ 0.9990003332  0.9803333333  0.985         0.9989996666  0.9946648883]]</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">train_scores_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">train_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">train_scores_std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">train_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">test_scores_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">test_scores_std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">train_sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">.</span><span class="mi">1</span><span class="p">,</span><span class="mf">1.0</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">train_scores_mean</span> <span class="o">-</span> <span class="n">train_scores_std</span><span class="p">,</span>
+                     <span class="n">train_scores_mean</span> <span class="o">+</span> <span class="n">train_scores_std</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+                     <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">test_scores_mean</span> <span class="o">-</span> <span class="n">test_scores_std</span><span class="p">,</span>
+                     <span class="n">test_scores_mean</span> <span class="o">+</span> <span class="n">test_scores_std</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;g&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">train_scores_mean</span><span class="p">,</span> <span class="s1">&#39;o-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+             <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Training score&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">test_scores_mean</span><span class="p">,</span> <span class="s1">&#39;o-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;g&quot;</span><span class="p">,</span>
+             <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Cross-validation score&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Training examples&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Score&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">&quot;best&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+
+<p><img alt="png" src="HR%20Exploration_files/HR%20Exploration_15_0.png"></p>
+<div class="highlight"><pre><span></span><span class="n">train_scores_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">train_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">3</span><span class="p">:]</span> <span class="c1"># 0.4 on</span>
+<span class="n">train_scores_std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">train_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">3</span><span class="p">:]</span>
+<span class="n">test_scores_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">3</span><span class="p">:]</span>
+<span class="n">test_scores_std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">3</span><span class="p">:]</span>
+<span class="n">train_sizes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">.</span><span class="mi">1</span><span class="p">,</span><span class="mf">1.0</span><span class="p">,</span><span class="mi">10</span><span class="p">)[</span><span class="mi">3</span><span class="p">:]</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">train_scores_mean</span> <span class="o">-</span> <span class="n">train_scores_std</span><span class="p">,</span>
+                     <span class="n">train_scores_mean</span> <span class="o">+</span> <span class="n">train_scores_std</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+                     <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">fill_between</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">test_scores_mean</span> <span class="o">-</span> <span class="n">test_scores_std</span><span class="p">,</span>
+                     <span class="n">test_scores_mean</span> <span class="o">+</span> <span class="n">test_scores_std</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;g&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">train_scores_mean</span><span class="p">,</span> <span class="s1">&#39;o-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">,</span>
+             <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Training score&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">train_sizes</span><span class="p">,</span> <span class="n">test_scores_mean</span><span class="p">,</span> <span class="s1">&#39;o-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">&quot;g&quot;</span><span class="p">,</span>
+             <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Cross-validation score&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">&quot;Training examples&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;Score&quot;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">grid</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s2">&quot;best&quot;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+
+<p><img alt="png" src="HR%20Exploration_files/HR%20Exploration_16_0.png"></p>
+<div class="highlight"><pre><span></span><span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s1">&#39;left&#39;</span><span class="p">],</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">left</span> 
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+
+
+<span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+<span class="n">clf</span><span class="o">.</span><span class="n">feature_importances_</span>
+<span class="c1"># Drop all lower than 0.01 relevance</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Index([&#39;satisfaction_level&#39;, &#39;last_evaluation&#39;, &#39;number_project&#39;,
+       &#39;average_montly_hours&#39;, &#39;time_spend_company&#39;, &#39;Work_accident&#39;,
+       &#39;promotion_last_5years&#39;, &#39;sales&#39;, &#39;salary&#39;, &#39;is_4&#39;, &#39;avg_per_team&#39;],
+      dtype=&#39;object&#39;)
+
+
+
+
+
+array([ 0.32805276,  0.11853322,  0.18245216,  0.14757901,  0.186516  ,
+        0.00783057,  0.00129782,  0.00892283,  0.00954625,  0.00080433,
+        0.00846506])
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># Dropping all with &lt;0.01 relevance seems to not affect score much (.9920-&gt;.9916)</span>
+<span class="n">drop</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">,</span> <span class="s1">&#39;promotion_last_5years&#39;</span><span class="p">,</span> <span class="s1">&#39;Work_accident&#39;</span><span class="p">,</span> <span class="s1">&#39;sales&#39;</span><span class="p">,</span> <span class="s1">&#39;salary&#39;</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">clf</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">classifiers</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Classifier &#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+
+    <span class="n">cross_val_left</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">clf</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="n">drop</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Classifier  0
+Cross val score:  0.99450795097
+[ 0.99989599  0.98623671  0.98705094  0.99963132  0.99972479]
+
+Classifier  1
+Cross val score:  0.994485333896
+[ 0.99990578  0.98579436  0.98744887  0.99962519  0.99965246]
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">hr</span><span class="o">.</span><span class="n">corr</span><span class="p">()[</span><span class="s2">&quot;left&quot;</span><span class="p">]</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>satisfaction_level      -0.388375
+last_evaluation          0.006567
+number_project           0.023787
+average_montly_hours     0.071287
+time_spend_company       0.144822
+Work_accident           -0.154622
+left                     1.000000
+promotion_last_5years   -0.061788
+sales                    0.032105
+salary                  -0.001294
+is_4                    -0.046035
+Name: left, dtype: float64
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># Drop everything with corr to left of &lt; 0.005</span>
+<span class="c1"># Makes it worse</span>
+<span class="n">drop</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">,</span>  <span class="s1">&#39;sales&#39;</span><span class="p">,</span> <span class="s1">&#39;salary&#39;</span><span class="p">]</span>
+<span class="n">classifiers</span> <span class="o">=</span> <span class="p">[</span><span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span> <span class="p">,</span><span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">),</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">criterion</span><span class="o">=</span><span class="s1">&#39;entropy&#39;</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)]</span><span class="c1">#, svm.SVC()]#xgb.XGBClassifier(n_estimators=500, nthread=-1)]# svm.SVC()]</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">clf</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">classifiers</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Classifier &#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+
+    <span class="n">cross_val_left</span><span class="p">(</span><span class="n">hr</span><span class="p">,</span> <span class="n">clf</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="n">drop</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Classifier  0
+Cross val score:  0.994111289948
+[ 0.99968583  0.98524786  0.98646125  0.99962488  0.99953662]
+
+Classifier  1
+Cross val score:  0.994280805443
+[ 0.99987427  0.98537989  0.98719829  0.99943763  0.99951394]
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">sklearn.feature_selection</span> <span class="kn">import</span> <span class="n">RFE</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">clf</span> <span class="o">=</span> <span class="n">RFE</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="mi">7</span> <span class="p">)</span>
+
+<span class="n">X</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s1">&#39;left&#39;</span><span class="p">],</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">left</span> 
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+
+
+<span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">clf</span><span class="o">.</span><span class="n">support_</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">clf</span><span class="o">.</span><span class="n">ranking_</span><span class="p">)</span>
+<span class="c1"># Gets same result as feature_importance, which makes sense</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">[ True  True  True  True  True False False  True  True False False]</span>
+<span class="k">[1 1 1 1 1 3 4 1 1 5 2]</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># from sklearn.feature_selection import RFE</span>
+<span class="c1"># model = svm.SVC(kernel=&#39;linear&#39;)</span>
+<span class="c1"># clf = RFE(model,5 )</span>
+
+<span class="c1"># X = hr.drop([&#39;left&#39;],1)</span>
+<span class="c1"># y = hr.left </span>
+<span class="c1"># X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)</span>
+
+
+<span class="c1"># clf.fit(X_train, y_train)</span>
+<span class="c1"># print(clf.support_)</span>
+<span class="c1"># print(clf.ranking_)</span>
+<span class="c1"># # Gets same result as feature_importance</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># PCA on relevant features</span>
+<span class="n">drop</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">,</span>  <span class="s1">&#39;sales&#39;</span><span class="p">,</span> <span class="s1">&#39;salary&#39;</span><span class="p">]</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">left</span><span class="p">)</span>
+
+<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">drop</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+<span class="n">pca</span> <span class="o">=</span> <span class="n">PCA</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="n">X_pca</span> <span class="o">=</span> <span class="n">pca</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">print</span><span class="p">(</span><span class="n">pca</span><span class="o">.</span><span class="n">components_</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>[[ -1.00023272e-04   1.16454622e-03   1.03016962e-02   9.99939260e-01
+    3.73903656e-03  -7.14279268e-05  -1.02210886e-05   3.40923099e-06
+   -1.97930557e-06]
+ [ -2.15441037e-02   1.53800123e-02   2.72326123e-01  -6.42153324e-03
+    9.61671473e-01   7.51616199e-04   6.30737234e-03   1.55475088e-02
+    1.56786116e-03]]
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">print</span><span class="p">(</span><span class="n">pca</span><span class="o">.</span><span class="n">explained_variance_ratio_</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">pca</span><span class="o">.</span><span class="n">explained_variance_ratio_</span><span class="p">))</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">[  9.98549061e-01   8.69441180e-04]</span>
+<span class="na">0.999418502162</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># Still get good accuracy, ~97%</span>
+<span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">left</span><span class="p">)</span> 
+
+<span class="n">scores</span> <span class="o">=</span> <span class="n">cross_val_score</span><span class="p">(</span><span class="n">clf</span><span class="p">,</span> <span class="n">X_pca</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="n">CV_FOLDS</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+
+
+<span class="k">print</span><span class="p">(</span><span class="s1">&#39;Cross val score: &#39;</span><span class="p">,</span> <span class="nb">sum</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span> <span class="o">/</span> <span class="n">CV_FOLDS</span> <span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Cross val score:  0.971332998837
+[ 0.97634122  0.953       0.956       0.98466155  0.98666222]
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">colors</span> <span class="o">=</span> <span class="n">cycle</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span>
+<span class="n">target_ids</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">target_ids</span><span class="p">,</span> <span class="n">colors</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;stay&quot;</span><span class="p">,</span><span class="s2">&quot;left&quot;</span><span class="p">]):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">X_pca</span><span class="p">[</span><span class="n">y</span> <span class="o">==</span> <span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">X_pca</span><span class="p">[</span><span class="n">y</span> <span class="o">==</span> <span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                <span class="n">c</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+
+<p><img alt="png" src="HR%20Exploration_files/HR%20Exploration_28_0.png"></p>
+<div class="highlight"><pre><span></span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># 3D PCA, Clear plane difference between them</span>
+<span class="n">drop</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;left&#39;</span><span class="p">,</span>  <span class="s1">&#39;sales&#39;</span><span class="p">,</span> <span class="s1">&#39;salary&#39;</span><span class="p">]</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">left</span><span class="p">)</span>
+
+<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">hr</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">drop</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+<span class="n">pca</span> <span class="o">=</span> <span class="n">PCA</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+<span class="n">X_pca</span> <span class="o">=</span> <span class="n">pca</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+<span class="n">colors</span> <span class="o">=</span> <span class="n">cycle</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span>
+<span class="n">target_ids</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">,</span> <span class="n">projection</span><span class="o">=</span><span class="s1">&#39;3d&#39;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">target_ids</span><span class="p">,</span> <span class="n">colors</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;stay&quot;</span><span class="p">,</span><span class="s2">&quot;left&quot;</span><span class="p">]):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">X_pca</span><span class="p">[</span><span class="n">y</span> <span class="o">==</span> <span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">X_pca</span><span class="p">[</span><span class="n">y</span> <span class="o">==</span> <span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span><span class="n">X_pca</span><span class="p">[</span><span class="n">y</span> <span class="o">==</span> <span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+                <span class="n">c</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+
+<span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;X Label&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Y Label&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_zlabel</span><span class="p">(</span><span class="s1">&#39;Z Label&#39;</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/matplotlib/collections.py:865: RuntimeWarning: invalid value encountered in sqrt
+  scale = np.sqrt(self._sizes) * dpi / 72.0 * self._factor
+</pre></div>
+
+
+<p><img alt="png" src="HR%20Exploration_files/HR%20Exploration_33_1.png"></p>
+<div class="highlight"><pre><span></span><span class="c1"># 3D accuracy is the same as 2D</span>
+<span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">left</span> 
+
+<span class="n">scores</span> <span class="o">=</span> <span class="n">cross_val_score</span><span class="p">(</span><span class="n">clf</span><span class="p">,</span> <span class="n">X_pca</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="n">CV_FOLDS</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+
+
+<span class="k">print</span><span class="p">(</span><span class="s1">&#39;Cross val score: &#39;</span><span class="p">,</span> <span class="nb">sum</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span> <span class="o">/</span> <span class="n">CV_FOLDS</span> <span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>Cross val score:  0.970999798837
+[ 0.97534155  0.95033333  0.957       0.98366122  0.98866289]
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="c1"># Attempt to find department level features, doesn&#39;t seem to matter</span>
+<span class="n">hr_corr</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">corr</span><span class="p">()</span>
+<span class="n">hr_corr</span><span class="p">[</span><span class="s2">&quot;sales&quot;</span><span class="p">]</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>satisfaction_level       0.003153
+last_evaluation          0.007772
+number_project           0.009268
+average_montly_hours     0.003913
+time_spend_company      -0.018010
+Work_accident            0.003425
+left                     0.032105
+promotion_last_5years   -0.027336
+sales                    1.000000
+salary                   0.000685
+is_4                    -0.136533
+Name: sales, dtype: float64
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">hr</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">values</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>array([&#39;satisfaction_level&#39;, &#39;last_evaluation&#39;, &#39;number_project&#39;,
+       &#39;average_montly_hours&#39;, &#39;time_spend_company&#39;, &#39;Work_accident&#39;,
+       &#39;left&#39;, &#39;promotion_last_5years&#39;, &#39;sales&#39;, &#39;salary&#39;, &#39;is_4&#39;,
+       &#39;avg_per_team&#39;], dtype=object)
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">hr</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="n">depProperties</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">&#39;sales&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">({</span><span class="n">col</span><span class="p">:[</span><span class="n">np</span><span class="o">.</span><span class="n">size</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">]})</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">depProperties</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>      satisfaction_level          
+                    size      mean
+sales                             
+0                 1227.0  0.618142
+1                  787.0  0.619822
+2                  767.0  0.582151
+3                  739.0  0.598809
+4                  630.0  0.621349
+5                  858.0  0.618601
+6                  902.0  0.619634
+7                 4140.0  0.614447
+8                 2229.0  0.618300
+9                 2720.0  0.607897
+      last_evaluation          
+                 size      mean
+sales                          
+0              1227.0  0.716830
+1               787.0  0.712122
+2               767.0  0.717718
+3               739.0  0.708850
+4               630.0  0.724000
+5               858.0  0.715886
+6               902.0  0.714756
+7              4140.0  0.709717
+8              2229.0  0.723109
+9              2720.0  0.721099
+      number_project          
+                size      mean
+sales                         
+0               1227  3.816626
+1                787  3.853875
+2                767  3.825293
+3                739  3.654939
+4                630  3.860317
+5                858  3.687646
+6                902  3.807095
+7               4140  3.776329
+8               2229  3.803948
+9               2720  3.877941
+      average_montly_hours            
+                      size        mean
+sales                                 
+0                     1227  202.215974
+1                      787  200.800508
+2                      767  201.162973
+3                      739  198.684709
+4                      630  201.249206
+5                      858  199.385781
+6                      902  199.965632
+7                     4140  200.911353
+8                     2229  200.758188
+9                     2720  202.497426
+      time_spend_company          
+                    size      mean
+sales                             
+0                   1227  3.468623
+1                    787  3.367217
+2                    767  3.522816
+3                    739  3.355886
+4                    630  4.303175
+5                    858  3.569930
+6                    902  3.475610
+7                   4140  3.534058
+8                   2229  3.393001
+9                   2720  3.411397
+      Work_accident          
+               size      mean
+sales                        
+0              1227  0.133659
+1               787  0.170267
+2               767  0.125163
+3               739  0.120433
+4               630  0.163492
+5               858  0.160839
+6               902  0.146341
+7              4140  0.141787
+8              2229  0.154778
+9              2720  0.140074
+       left          
+       size      mean
+sales                
+0      1227  0.222494
+1       787  0.153748
+2       767  0.265971
+3       739  0.290934
+4       630  0.144444
+5       858  0.236597
+6       902  0.219512
+7      4140  0.244928
+8      2229  0.248991
+9      2720  0.256250
+      promotion_last_5years          
+                       size      mean
+sales                                
+0                      1227  0.002445
+1                       787  0.034307
+2                       767  0.018253
+3                       739  0.020298
+4                       630  0.109524
+5                       858  0.050117
+6                       902  0.000000
+7                      4140  0.024155
+8                      2229  0.008973
+9                      2720  0.010294
+      sales     
+       size mean
+sales           
+0      1227    0
+1       787    1
+2       767    2
+3       739    3
+4       630    4
+5       858    5
+6       902    6
+7      4140    7
+8      2229    8
+9      2720    9
+      salary          
+        size      mean
+sales                 
+0       1227  1.368378
+1        787  1.407878
+2        767  1.340287
+3        739  1.424899
+4        630  1.000000
+5        858  1.344988
+6        902  1.349224
+7       4140  1.363043
+8       2229  1.359354
+9       2720  1.347794
+       is_4       
+       size   mean
+sales             
+0      1227  False
+1       787  False
+2       767  False
+3       739  False
+4       630   True
+5       858  False
+6       902  False
+7      4140  False
+8      2229  False
+9      2720  False
+
+
+
+---------------------------------------------------------------------------
+
+DataError                                 Traceback (most recent call last)
+
+&lt;ipython-input-29-c7f435eb979a&gt; in &lt;module&gt;()
+      1 for col in hr.columns:
+----&gt; 2     depProperties = hr.groupby(&#39;sales&#39;).agg({col:[np.size,np.mean]})
+      3     print(depProperties)
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/groupby.py in aggregate(self, arg, *args, **kwargs)
+   3702     @Appender(SelectionMixin._agg_doc)
+   3703     def aggregate(self, arg, *args, **kwargs):
+-&gt; 3704         return super(DataFrameGroupBy, self).aggregate(arg, *args, **kwargs)
+   3705 
+   3706     agg = aggregate
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/groupby.py in aggregate(self, arg, *args, **kwargs)
+   3191 
+   3192         _level = kwargs.pop(&#39;_level&#39;, None)
+-&gt; 3193         result, how = self._aggregate(arg, _level=_level, *args, **kwargs)
+   3194         if how is None:
+   3195             return result
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/base.py in _aggregate(self, arg, *args, **kwargs)
+    547 
+    548                 try:
+--&gt; 549                     result = _agg(arg, _agg_1dim)
+    550                 except SpecificationError:
+    551
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/base.py in _agg(arg, func)
+    498                 result = compat.OrderedDict()
+    499                 for fname, agg_how in compat.iteritems(arg):
+--&gt; 500                     result[fname] = func(fname, agg_how)
+    501                 return result
+    502
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/base.py in _agg_1dim(name, how, subset)
+    481                     raise SpecificationError(&quot;nested dictionary is ambiguous &quot;
+    482                                              &quot;in aggregation&quot;)
+--&gt; 483                 return colg.aggregate(how, _level=(_level or 0) + 1)
+    484 
+    485             def _agg_2dim(name, how):
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/groupby.py in aggregate(self, func_or_funcs, *args, **kwargs)
+   2654         if hasattr(func_or_funcs, &#39;__iter__&#39;):
+   2655             ret = self._aggregate_multiple_funcs(func_or_funcs,
+-&gt; 2656                                                  (_level or 0) + 1)
+   2657         else:
+   2658             cyfunc = self._is_cython_func(func_or_funcs)
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/groupby.py in _aggregate_multiple_funcs(self, arg, _level)
+   2716                 obj._reset_cache()
+   2717                 obj._selection = name
+-&gt; 2718             results[name] = obj.aggregate(func)
+   2719 
+   2720         if isinstance(list(compat.itervalues(results))[0],
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/groupby.py in aggregate(self, func_or_funcs, *args, **kwargs)
+   2658             cyfunc = self._is_cython_func(func_or_funcs)
+   2659             if cyfunc and not args and not kwargs:
+-&gt; 2660                 return getattr(self, cyfunc)()
+   2661 
+   2662             if self.grouper.nkeys &gt; 1:
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/groupby.py in mean(self, *args, **kwargs)
+   1017         nv.validate_groupby_func(&#39;mean&#39;, args, kwargs)
+   1018         try:
+-&gt; 1019             return self._cython_agg_general(&#39;mean&#39;)
+   1020         except GroupByError:
+   1021             raise
+
+
+/home/altock/anaconda3/envs/py35/lib/python3.5/site-packages/pandas/core/groupby.py in _cython_agg_general(self, how, numeric_only)
+    806 
+    807         if len(output) == 0:
+--&gt; 808             raise DataError(&#39;No numeric types to aggregate&#39;)
+    809 
+    810         return self._wrap_aggregated_output(output, names)
+
+
+DataError: No numeric types to aggregate
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="n">clf</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">drop</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">hr</span><span class="o">.</span><span class="n">left</span> 
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+
+
+<span class="n">clf</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="n">y_pred</span> <span class="o">=</span> <span class="n">clf</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">plot_confusion_matrix</span><span class="p">(</span><span class="n">cm</span><span class="p">,</span> <span class="n">classes</span><span class="p">,</span>
+                          <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Confusion matrix&#39;</span><span class="p">,</span>
+                          <span class="n">cmap</span><span class="o">=</span><span class="n">plt</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">Blues</span><span class="p">):</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">cm</span><span class="p">,</span> <span class="n">interpolation</span><span class="o">=</span><span class="s1">&#39;nearest&#39;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="n">cmap</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">()</span>
+    <span class="n">tick_marks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">classes</span><span class="p">))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="n">tick_marks</span><span class="p">,</span> <span class="n">classes</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">45</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">yticks</span><span class="p">(</span><span class="n">tick_marks</span><span class="p">,</span> <span class="n">classes</span><span class="p">)</span>
+
+    <span class="n">thresh</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">/</span> <span class="mf">2.</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="nb">range</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])):</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">cm</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span>
+                 <span class="n">horizontalalignment</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">,</span>
+                 <span class="n">color</span><span class="o">=</span><span class="s2">&quot;white&quot;</span> <span class="k">if</span> <span class="n">cm</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">thresh</span> <span class="k">else</span> <span class="s2">&quot;black&quot;</span><span class="p">)</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;True label&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Predicted label&#39;</span><span class="p">)</span>
+
+<span class="c1"># Compute confusion matrix</span>
+<span class="n">cnf_matrix</span> <span class="o">=</span> <span class="n">confusion_matrix</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">precision</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="n">class_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Stay&quot;</span><span class="p">,</span><span class="s2">&quot;Left&quot;</span><span class="p">]</span>
+
+<span class="n">plot_confusion_matrix</span><span class="p">(</span><span class="n">cnf_matrix</span><span class="p">,</span> <span class="n">classes</span><span class="o">=</span><span class="n">class_names</span><span class="p">,</span>
+                      <span class="n">title</span><span class="o">=</span><span class="s1">&#39;Confusion matrix&#39;</span><span class="p">)</span>
+
+
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+
+<p><img alt="png" src="HR%20Exploration_files/HR%20Exploration_39_0.png"></p>
+<div class="highlight"><pre><span></span><span class="k">print</span><span class="p">(</span><span class="n">classification_report</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span><span class="n">y_pred</span><span class="p">,</span> <span class="n">target_names</span><span class="o">=</span><span class="n">class_names</span><span class="p">))</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>             precision    recall  f1-score   support
+
+       Stay       0.99      1.00      0.99      2278
+       Left       0.99      0.96      0.98       722
+
+avg / total       0.99      0.99      0.99      3000
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>
+</pre></div>                </article>
+            </aside><!-- /#featured -->
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>links</h2>
+                        <ul>
+                            <li><a href="http://getpelican.com/">Pelican</a></li>
+                            <li><a href="http://python.org/">Python.org</a></li>
+                            <li><a href="http://jinja.pocoo.org/">Jinja2</a></li>
+                            <li><a href="#">You can modify those links in your config file</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+
+                            <li><a href="#">You can add links in your config file</a></li>
+                            <li><a href="#">Another social link</a></li>
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>
